@@ -4435,9 +4435,11 @@ class Writer:
     def close(self):
         if self.fname != '<stdout>':
             self.f.close()
-    def write_line(self, line=None):
+    def write_line(self, line=None, nonewline=False):
         if not (self.skip_blank_lines and (not line or not line.strip())):
-            self.f.write((line or '') + self.newline)
+            self.f.write(line or '')
+            if not nonewline:
+              self.f.write(self.newline)
             self.lines_out = self.lines_out + 1
     def write(self,*args,**kwargs):
         """Iterates arguments, writes tuple and list arguments one line per
@@ -4446,16 +4448,17 @@ class Writer:
         appended to each line."""
         if 'trace' in kwargs and len(args) > 0:
             trace(kwargs['trace'],args[0])
+        nonewline = kwargs.get('nonewline')
         if len(args) == 0:
-            self.write_line()
+            self.write_line(nonewline=nonewline)
             self.lines_out = self.lines_out + 1
         else:
             for arg in args:
                 if is_array(arg):
                     for s in arg:
-                        self.write_line(s)
+                        self.write_line(s, nonewline=nonewline)
                 elif arg is not None:
-                    self.write_line(arg)
+                    self.write_line(arg, nonewline=nonewline)
     def write_tag(self,tag,content,subs=None,d=None,**kwargs):
         """Write content enveloped by tag.
         Substitutions specified in the 'subs' list are perform on the
@@ -4464,14 +4467,15 @@ class Writer:
             subs = config.subsnormal
         stag,etag = subs_tag(tag,d)
         content = Lex.subs(content,subs)
+        nonewline=kwargs.get('nonewline')
         if 'trace' in kwargs:
             trace(kwargs['trace'],[stag]+content+[etag])
         if stag:
-            self.write(stag)
+            self.write(stag,nonewline=nonewline)
         if content:
-            self.write(content)
+            self.write(content,nonewline=nonewline)
         if etag:
-            self.write(etag)
+            self.write(etag,nonewline=nonewline)
 
 #---------------------------------------------------------------------------
 # Configuration file processing.
