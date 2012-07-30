@@ -41,7 +41,6 @@ def data_files_from_manifest(install_prefix):
   with open(MANIFEST_LIST) as manifest:
     for line in manifest:
       for path in glob(line.strip()):
-        print 'PATH', path
         if isdir(path):
           out.extend(non_python_files(install_prefix, path))
         else:
