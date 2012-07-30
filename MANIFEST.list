@@ -78,6 +78,7 @@ install-sh
 javascripts/*.js
 README
 README.txt
+setup.py
 stylesheets/*.css
 tests/testasciidoc.py
 tests/testasciidoc.conf
@@ -88,3 +89,5 @@ themes/flask/*.css
 themes/volnitsky/*.css
 vim/syntax/asciidoc.vim
 vim/ftdetect/asciidoc_filetype.vim
+asciidoc
+MANIFEST.list
