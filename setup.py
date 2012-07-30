@@ -49,7 +49,7 @@ def data_files_from_manifest(install_prefix):
 
 setup(
     name='AsciiDoc',
-    version='8.6.8',
+    version='8.6.8-jedahu',
     author='Stuart Rackham',
     author_email='srackham@gmail.com',
     url='http://methods.co.nz/asciidoc/',
