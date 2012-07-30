@@ -2809,7 +2809,7 @@ class List(AbstractBlock):
         while Lex.next() is self:
             reader.read()   # Discard (already parsed item first line).
             writer.write_tag(self.tag.term, [self.label],
-                             self.presubs, self.attributes,trace='list term')
+                             self.presubs, self.attributes,trace='list term',nonewline=True)
             if self.text: break
         writer.write(labeltag[1],trace='list label close')
         # Write item text.
