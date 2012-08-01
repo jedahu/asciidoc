@@ -5856,23 +5856,23 @@ HELP_FILE = 'help.conf'     # Default (English) help file.
 
 # Globals
 # -------
-document = Document()       # The document being processed.
-config = Config()           # Configuration file reader.
-reader = Reader()           # Input stream line reader.
-writer = Writer()           # Output stream line writer.
-message = Message()         # Message functions.
-paragraphs = Paragraphs()   # Paragraph definitions.
-lists = Lists()             # List definitions.
-blocks = DelimitedBlocks()  # DelimitedBlock definitions.
-tables_OLD = Tables_OLD()   # Table_OLD definitions.
-tables = Tables()           # Table definitions.
-macros = Macros()           # Macro definitions.
-calloutmap = CalloutMap()   # Coordinates callouts and callout list.
-trace = Trace()             # Implements trace attribute processing.
+document = None     # The document being processed.
+config = None       # Configuration file reader.
+reader = None       # Input stream line reader.
+writer = None       # Output stream line writer.
+message = None      # Message functions.
+paragraphs = None   # Paragraph definitions.
+lists = None        # List definitions.
+blocks = None       # DelimitedBlock definitions.
+tables_OLD = None   # Table_OLD definitions.
+tables = None       # Table definitions.
+macros = None       # Macro definitions.
+calloutmap = None   # Coordinates callouts and callout list.
+trace = None        # Implements trace attribute processing.
 
 ### Used by asciidocapi.py ###
 # List of message strings written to stderr.
-messages = message.messages
+messages = None
 
 
 def asciidoc(backend, doctype, confiles, infile, outfile, options):
@@ -6096,6 +6096,37 @@ def execute(cmd,opts,args):
        >>>
 
     """
+    # Reset globals
+    global document
+    document = Document()
+    global config
+    config = Config()
+    global reader
+    reader = Reader()
+    global writer
+    writer = Writer()
+    global message
+    message = Message()
+    global paragraphs
+    paragraphs = Paragraphs()
+    global lists
+    lists = Lists()
+    global blocks
+    blocks = DelimitedBlocks()
+    global tables_OLD
+    tables_OLD = Tables_OLD()
+    global tables
+    tables = Tables()
+    global macros
+    macros = Macros()
+    global calloutmap
+    calloutmap = CalloutMap()
+    global trace
+    trace = Trace()
+    global messages
+    messages = message.messages
+    AbstractBlock.blocknames = []
+
     config.init()
     if len(args) > 1:
         usage('Too many arguments')
