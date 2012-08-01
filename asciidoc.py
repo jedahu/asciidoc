@@ -770,7 +770,7 @@ def py_filter_lines(module, function, lines, attrs={}):
     # Return input lines if there's no filter.
     if not module or not module.strip():
         return lines
-
+    # Get module
     if module in sys.modules:
         filter_mod = sys.modules[module]
     else:
@@ -799,6 +799,7 @@ def py_filter_lines(module, function, lines, attrs={}):
         result = []
     if lines and not result:
         message.warning('no output from filter: %s' % module)
+        return lines
     return result
 
 def filter_lines(filter_cmd, lines, attrs={}):
