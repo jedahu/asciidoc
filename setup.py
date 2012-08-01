@@ -56,6 +56,7 @@ setup(
     license='GPL license, see COPYING',
     description='Simple blog engine.',
     long_description=open('README.txt').read(),
+    py_modules['asciidocapi'],
     packages['asciidoc'],
     include_package_data=True
     )
