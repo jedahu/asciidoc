@@ -799,6 +799,7 @@ def py_filter_lines(module, function, lines, attrs={}):
         result = []
     if lines and not result:
         message.warning('no output from filter: %s' % module)
+        return lines
     return result
 
 def filter_lines(filter_cmd, lines, attrs={}):
