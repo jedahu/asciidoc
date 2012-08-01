@@ -56,12 +56,6 @@ setup(
     license='GPL license, see COPYING',
     description='Simple blog engine.',
     long_description=open('README.txt').read(),
-    scripts=['asciidoc'],
-
-    # If asciidoc(api).py were in a package, the packages, package_dir, and
-    # package_data args could be used instead of the three below and that awful
-    # install_dir hack.
-    py_modules=['asciidoc', 'asciidocapi'],
-    extra_path=EXTRA_PATH,
-    data_files=data_files_from_manifest(install_dir())
+    packages['asciidoc'],
+    include_package_data=True
     )
