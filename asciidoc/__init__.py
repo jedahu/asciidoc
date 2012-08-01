@@ -234,6 +234,8 @@ def userdir():
     result = os.path.expanduser('~')
     if result == '~':
         result = None
+    else:
+      os.path.join(result, '.asciidoc')
     return result
 
 def localapp():
@@ -4542,29 +4544,14 @@ class Config:
         self.dumping = False    # True if asciidoc -c option specified.
         self.filters = []       # Filter names specified by --filter option.
 
-    def init(self, cmd):
+    def init(self):
         """
-        Check Python version and locate the executable and configuration files
-        directory.
-        cmd is the asciidoc command or asciidoc.py path.
+        Check Python version.
         """
         if float(sys.version[:3]) < float(MIN_PYTHON_VERSION):
             message.stderr('FAILED: Python %s or better required' %
                     MIN_PYTHON_VERSION)
             sys.exit(1)
-        if not os.path.exists(cmd):
-            message.stderr('FAILED: Missing asciidoc command: %s' % cmd)
-            sys.exit(1)
-        global APP_FILE
-        APP_FILE = os.path.realpath(cmd)
-        global APP_DIR
-        APP_DIR = os.path.dirname(APP_FILE)
-        global USER_DIR
-        USER_DIR = userdir()
-        if USER_DIR is not None:
-            USER_DIR = os.path.join(USER_DIR,'.asciidoc')
-            if not os.path.isdir(USER_DIR):
-                USER_DIR = None
 
     def load_file(self, fname, dir=None, include=[], exclude=[]):
         """
@@ -5752,7 +5739,7 @@ class Plugin:
         """
         result = userdir()
         if result:
-            result = os.path.join(result, '.asciidoc', Plugin.type+'s')
+            result = os.path.join(result, Plugin.type+'s')
         return result
 
     @staticmethod
@@ -5860,9 +5847,9 @@ class Plugin:
 #---------------------------------------------------------------------------
 # Constants
 # ---------
-APP_FILE = None             # This file's full path.
-APP_DIR = None              # This file's directory.
-USER_DIR = None             # ~/.asciidoc
+APP_FILE = os.path.realpath(__file__) # This file's full path.
+APP_DIR = os.path.dirname(APP_FILE)   # This file's directory.
+USER_DIR = userdir()                  # ~/.asciidoc
 # Global configuration files directory (set by Makefile build target).
 CONF_DIR = '/etc/asciidoc'
 HELP_FILE = 'help.conf'     # Default (English) help file.
@@ -6109,7 +6096,7 @@ def execute(cmd,opts,args):
        >>>
 
     """
-    config.init(cmd)
+    config.init()
     if len(args) > 1:
         usage('Too many arguments')
         sys.exit(1)
@@ -6249,7 +6236,7 @@ def main():
         if cmd not in Plugin.CMDS:
             die('illegal --%s command: %s' % (plugin, cmd))
         Plugin.type = plugin
-        config.init(sys.argv[0])
+        config.init()
         config.verbose = bool(set(['-v','--verbose']) & set(opt_names))
         getattr(Plugin,cmd)(args)
     else:
