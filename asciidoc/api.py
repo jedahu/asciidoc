@@ -52,7 +52,7 @@ under the terms of the GNU General Public License (GPL).
 
 """
 
-import sys,os,re,imp
+import sys,os,re,imp,asciidoc
 
 API_VERSION = '0.1.2'
 MIN_ASCIIDOC_VERSION = '8.4.1'  # Minimum acceptable AsciiDoc version.
@@ -145,7 +145,7 @@ class AsciiDocAPI(object):
     """
     AsciiDoc API class.
     """
-    def __init__(self, asciidoc_py=None):
+    def __init__(self):
         """
         Locate and import asciidoc.py.
         Initialize instance attributes.
@@ -153,29 +153,7 @@ class AsciiDocAPI(object):
         self.options = Options()
         self.attributes = {}
         self.messages = []
-        # Search for the asciidoc command file.
-        # Try ASCIIDOC_PY environment variable first.
-        cmd = os.environ.get('ASCIIDOC_PY')
-        if cmd:
-            if not os.path.isfile(cmd):
-                raise AsciiDocError('missing ASCIIDOC_PY file: %s' % cmd)
-        elif asciidoc_py:
-            # Next try path specified by caller.
-            cmd = asciidoc_py
-            if not os.path.isfile(cmd):
-                raise AsciiDocError('missing file: %s' % cmd)
-        else:
-            # Try shell search paths.
-            for fname in ['asciidoc.py','asciidoc.pyc','asciidoc']:
-                cmd = find_in_path(fname)
-                if cmd: break
-            else:
-                # Finally try current working directory.
-                for cmd in ['asciidoc.py','asciidoc.pyc','asciidoc']:
-                    if os.path.isfile(cmd): break
-                else:
-                    raise AsciiDocError('failed to locate asciidoc')
-        self.cmd = os.path.realpath(cmd)
+        self.cmd = os.path.realpath(asciidoc.__file__)
         self.__import_asciidoc()
 
     def __import_asciidoc(self, reload=False):
