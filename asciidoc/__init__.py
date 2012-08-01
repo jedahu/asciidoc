@@ -6204,7 +6204,7 @@ def execute(cmd,opts,args):
     finally:
         sys.stdin,sys.stdout = stdin,stdout
 
-if __name__ == '__main__':
+def main():
     # Process command line options.
     import getopt
     try:

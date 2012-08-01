@@ -1,0 +1,3 @@
+import asciidoc
+
+asciidoc.main()
