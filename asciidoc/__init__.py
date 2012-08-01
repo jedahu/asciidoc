@@ -6245,3 +6245,6 @@ def main():
             execute(sys.argv[0],opts,args)
         except KeyboardInterrupt:
             sys.exit(1)
+
+if __name__ == '__main__':
+    main()
