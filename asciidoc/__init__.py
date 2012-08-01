@@ -36,6 +36,8 @@ OR, AND = ',', '+'              # Attribute list separators.
 # Utility functions and classes.
 #---------------------------------------------------------------------------
 
+is_main = __name__ == '__main__'
+
 class EAsciiDoc(Exception): pass
 
 class OrderedDict(dict):
@@ -167,7 +169,7 @@ class Message:
     """
     Message functions.
     """
-    PROG = os.path.basename(os.path.splitext(__file__)[0])
+    PROG = __package__
 
     def __init__(self):
         # Set to True or False to globally override line numbers method
@@ -183,7 +185,7 @@ class Message:
         if msg == self.prev_msg:  # Suppress repeated messages.
             return
         self.messages.append(msg)
-        if __name__ == '__main__':
+        if is_main:
             sys.stderr.write('%s: %s%s' % (self.PROG, msg, os.linesep))
         self.prev_msg = msg
 
@@ -6020,7 +6022,7 @@ def asciidoc(backend, doctype, confiles, infile, outfile, options):
         if isinstance(e, EAsciiDoc):
             message.stderr('%s%s' % (msg,str(e)))
         else:
-            if __name__ == '__main__':
+            if is_main:
                 message.stderr(msg+'unexpected error:')
                 message.stderr('-'*60)
                 traceback.print_exc(file=sys.stderr)
