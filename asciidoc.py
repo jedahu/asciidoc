@@ -6,7 +6,7 @@ Copyright (C) 2002-2010 Stuart Rackham. Free use of this software is granted
 under the terms of the GNU General Public License (GPL).
 """
 
-import sys, os, re, time, traceback, tempfile, subprocess, codecs, locale, unicodedata, copy
+import sys, os, re, time, traceback, tempfile, subprocess, codecs, locale, unicodedata, copy, imp
 
 ### Used by asciidocapi.py ###
 VERSION = '8.6.8'           # See CHANGLOG file for version history.
@@ -744,6 +744,62 @@ def is_attr_defined(attrs,dic):
         else: return True
     else:
         return dic.get(attrs.strip()) is not None
+
+def py_filter_lines(module, function, lines, attrs={}):
+    """
+    Run 'lines' throught the 'filter_src' python code and return the result,
+    optionally loading a 'filter_py' file first.
+
+    The 'attrs' dictionary contains additional filter attributes.
+    """
+    def mod_dirs(name, dirs):
+        """Find filter file 'fname' with style name 'name' in directory
+        'dir'. Return found file path or None if not found."""
+        out = []
+        for dir in dirs:
+            if dir:
+              if name:
+                  out.append(os.path.join(dir,'filters',name))
+              else:
+                  out.append(os.path.join(dir,'filters'))
+        return out
+
+    # Default function name
+    if not function:
+      function = 'filter_asciidoc'
+    # Return input lines if there's no filter.
+    if not module or not module.strip():
+        return lines
+
+    if module in sys.modules:
+        filter_mod = sys.modules[module]
+    else:
+        filtername = attrs.get('style')
+        docdir = document.attributes.get('docdir')
+        extra_dirs = [docdir, USER_DIR, APP_DIR, CONF_DIR]
+        mod_file, mod_path, mod_descr = imp.find_module(
+            module,
+            mod_dirs(filtername, extra_dirs))
+        try:
+          filter_mod = imp.load_module(module, mod_file, mod_path, mod_descr)
+        except Exception:
+            raise EAsciiDoc,'filter error: %s: %s' % (module, sys.exc_info()[1])
+        finally:
+          if mod_file:
+            mod_file.close()
+    try:
+        output = getattr(filter_mod, function)(lines, encoding=char_encoding(), **attrs)
+    except Exception:
+        raise EAsciiDoc,'filter error: %s: %s' % (module, sys.exc_info()[1])
+    if output and type(output) == unicode or type(output) == str:
+        result = [s.rstrip() for s in output.split(os.linesep)]
+    elif output:
+        result = output
+    else:
+        result = []
+    if lines and not result:
+        message.warning('no output from filter: %s' % module)
+    return result
 
 def filter_lines(filter_cmd, lines, attrs={}):
     """
@@ -2330,7 +2386,8 @@ class AbstractBlock:
     def __init__(self):
         # Configuration parameter names common to all blocks.
         self.CONF_ENTRIES = ('delimiter','options','subs','presubs','postsubs',
-                             'posattrs','style','.*-style','template','filter')
+                             'posattrs','style','.*-style','template','filter',
+                             'filter_module', 'filter_function')
         self.start = None   # File reader cursor at start delimiter.
         self.defname=None   # Configuration file block definition section name.
         # Configuration parameters.
@@ -2341,6 +2398,8 @@ class AbstractBlock:
         self.presubs=None   # presubs/subs entry list.
         self.postsubs=()    # postsubs entry list.
         self.filter=None    # filter entry.
+        self.filter_module=None # python filter module
+        self.filter_function=None # python filter function
         self.posattrs=()    # posattrs entry list.
         self.style=None     # Default style.
         self.styles=OrderedDict() # Each entry is a styles dictionary.
@@ -2351,7 +2410,8 @@ class AbstractBlock:
         # (self.parameters).
         self.attributes={}
         # The names of block parameters.
-        self.PARAM_NAMES=('template','options','presubs','postsubs','filter')
+        self.PARAM_NAMES=('template','options','presubs','postsubs','filter',
+                          'filter_module', 'filter_function')
         self.parameters=None
         # Leading delimiter match object.
         self.mo=None
@@ -2395,7 +2455,7 @@ class AbstractBlock:
                 if not is_name(v):
                     raise EAsciiDoc, msg % (k,v)
                 copy(dst,k,v)
-            elif k == 'filter':
+            elif k in ('filter', 'filter_module', 'filter_function'):
                 copy(dst,k,v)
             elif k == 'options':
                 if isinstance(v,str):
@@ -2477,6 +2537,10 @@ class AbstractBlock:
             write('postsubs='+','.join(self.postsubs))
         if self.filter:
             write('filter='+self.filter)
+        if self.filter_module:
+            write('filter_module='+self.filter_module)
+        if self.filter_function:
+            write('filter_function='+self.filter_function)
         if self.posattrs:
             write('posattrs='+','.join(self.posattrs))
         if self.style:
@@ -2725,6 +2789,12 @@ class Paragraph(AbstractBlock):
         stag = config.section2tags(template, self.attributes,skipend=True)[0]
         if self.parameters.filter:
             body = filter_lines(self.parameters.filter,body,self.attributes)
+        if self.parameters.filter_module:
+            body = py_filter_lines(
+                self.parameters.filter_module,
+                self.parameters.filter_function,
+                body,
+                self.attributes)
         body = Lex.subs(body,postsubs)
         etag = config.section2tags(template, self.attributes,skipstart=True)[1]
         # Write start tag, content, end tag.
@@ -3081,6 +3151,12 @@ class DelimitedBlock(AbstractBlock):
                 body = Lex.subs(body,presubs)
                 if self.parameters.filter:
                     body = filter_lines(self.parameters.filter,body,self.attributes)
+                if self.parameters.filter_module:
+                    body = py_filter_lines(
+                        self.parameters.filter_module,
+                        self.parameters.filter_function,
+                        body,
+                        self.attributes)
                 body = Lex.subs(body,postsubs)
                 # Write start tag, content, end tag.
                 etag = config.section2tags(template,self.attributes,skipstart=True)[1]
@@ -3495,6 +3571,9 @@ class Table(AbstractBlock):
             data = Lex.subs(data, presubs)
             data = filter_lines(self.get_param('filter',colstyle),
                                 data, self.attributes)
+            data = py_filter_lines(self.get_param('filter_module',colstyle),
+                                   self.get_param('filter_function',colstyle),
+                                   data, self.attributes)
             data = Lex.subs(data, postsubs)
             if rowtype != 'header':
                 ptag = tags.paragraph
