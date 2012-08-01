@@ -154,43 +154,6 @@ class AsciiDocAPI(object):
         self.attributes = {}
         self.messages = []
         self.cmd = os.path.realpath(asciidoc.__file__)
-        self.__import_asciidoc()
-
-    def __import_asciidoc(self, reload=False):
-        '''
-        Import asciidoc module (script or compiled .pyc).
-        See
-        http://groups.google.com/group/asciidoc/browse_frm/thread/66e7b59d12cd2f91
-        for an explanation of why a seemingly straight-forward job turned out
-        quite complicated.
-        '''
-        if os.path.splitext(self.cmd)[1] in ['.py','.pyc']:
-            sys.path.insert(0, os.path.dirname(self.cmd))
-            try:
-                try:
-                    if reload:
-                        import __builtin__  # Because reload() is shadowed.
-                        __builtin__.reload(self.asciidoc)
-                    else:
-                        import asciidoc
-                        self.asciidoc = asciidoc
-                except ImportError:
-                    raise AsciiDocError('failed to import ' + self.cmd)
-            finally:
-                del sys.path[0]
-        else:
-            # The import statement can only handle .py or .pyc files, have to
-            # use imp.load_source() for scripts with other names.
-            try:
-                imp.load_source('asciidoc', self.cmd)
-                import asciidoc
-                self.asciidoc = asciidoc
-            except ImportError:
-                raise AsciiDocError('failed to import ' + self.cmd)
-        if Version(self.asciidoc.VERSION) < Version(MIN_ASCIIDOC_VERSION):
-            raise AsciiDocError(
-                'asciidocapi %s requires asciidoc %s or better'
-                % (API_VERSION, MIN_ASCIIDOC_VERSION))
 
     def execute(self, infile, outfile=None, backend=None):
         """
@@ -212,13 +175,9 @@ class AsciiDocAPI(object):
                 s = '%s=%s' % (k,v)
             opts('--attribute', s)
         args = [infile]
-        # The AsciiDoc command was designed to process source text then
-        # exit, there are globals and statics in asciidoc.py that have
-        # to be reinitialized before each run -- hence the reload.
-        self.__import_asciidoc(reload=True)
         try:
             try:
-                self.asciidoc.execute(self.cmd, opts.values, args)
+                self.asciidoc.execute(opts.values, args)
             finally:
                 self.messages = self.asciidoc.messages[:]
         except SystemExit, e:

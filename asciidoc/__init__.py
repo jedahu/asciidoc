@@ -6072,10 +6072,9 @@ def show_help(topic, f=None):
             print >>f, line
 
 ### Used by asciidocapi.py ###
-def execute(cmd,opts,args):
+def execute(opts,args):
     """
     Execute asciidoc with command-line options and arguments.
-    cmd is asciidoc command or asciidoc.py path.
     opts and args conform to values returned by getopt.getopt().
     Raises SystemExit if an error occurs.
 
@@ -6091,7 +6090,7 @@ def execute(cmd,opts,args):
        >>> opts.append(('--no-header-footer',None))
        >>> opts.append(('--attribute','author=Joe Bloggs'))
        >>> opts.append(('--out-file',outfile))
-       >>> execute(__file__, opts, [infile])
+       >>> execute(opts, [infile])
        >>> print outfile.getvalue()
        <p>Hello <strong>Joe Bloggs</strong></p>
 
@@ -6251,6 +6250,7 @@ def main():
             sys.exit(1)
     # Look for plugin management commands.
     count = 0
+    cmd = None
     for o,v in opts:
         if o in ('-b','--backend','--filter','--theme'):
             if o == '-b':
@@ -6275,7 +6275,7 @@ def main():
     else:
         # Execute asciidoc.
         try:
-            execute(sys.argv[0],opts,args)
+            execute(opts,args)
         except KeyboardInterrupt:
             sys.exit(1)
 
