@@ -6,7 +6,7 @@ Copyright (C) 2002-2010 Stuart Rackham. Free use of this software is granted
 under the terms of the GNU General Public License (GPL).
 """
 
-import sys, os, re, time, traceback, tempfile, subprocess, codecs, locale, unicodedata, copy, imp
+import sys, os, re, time, traceback, tempfile, subprocess, codecs, locale, unicodedata, copy, importlib
 
 ### Used by asciidocapi.py ###
 VERSION = '8.6.8'           # See CHANGLOG file for version history.
@@ -776,17 +776,15 @@ def py_filter_lines(module, function, lines, attrs={}):
     else:
         filtername = attrs.get('style')
         docdir = document.attributes.get('docdir')
-        extra_dirs = [docdir, USER_DIR, APP_DIR, CONF_DIR]
-        mod_file, mod_path, mod_descr = imp.find_module(
-            module,
-            mod_dirs(filtername, extra_dirs))
+        extra_dirs = mod_dirs(filtername, [docdir, USER_DIR, APP_DIR, CONF_DIR])
+        orig_sys_path = sys.path
+        sys.path = extra_dirs + sys.path
         try:
-          filter_mod = imp.load_module(module, mod_file, mod_path, mod_descr)
+            filter_mod = importlib.import_module(module)
         except Exception:
-            raise EAsciiDoc,'filter error: %s: %s' % (module, sys.exc_info()[1])
+            raise EAsciiDoc,'failed to import filter: %s: %s' % (module, sys.exc_info()[1])
         finally:
-          if mod_file:
-            mod_file.close()
+            sys.path = orig_sys_path
     try:
         output = getattr(filter_mod, function)(lines, encoding=char_encoding(), **attrs)
     except Exception:
