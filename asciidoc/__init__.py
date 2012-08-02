@@ -751,7 +751,7 @@ def is_attr_defined(attrs,dic):
     else:
         return dic.get(attrs.strip()) is not None
 
-def py_filter_lines(module, function, lines, attrs={}):
+def py_filter_lines(g, module, function, lines, attrs={}):
     """
     Run 'lines' throught the 'filter_src' python code and return the result,
     optionally loading a 'filter_py' file first.
@@ -781,7 +781,7 @@ def py_filter_lines(module, function, lines, attrs={}):
         filter_mod = sys.modules[module]
     else:
         filtername = attrs.get('style')
-        docdir = document.attributes.get('docdir')
+        docdir = g.document.attributes.get('docdir')
         extra_dirs = mod_dirs(filtername, [docdir, USER_DIR, APP_DIR, CONF_DIR])
         orig_sys_path = sys.path
         sys.path = extra_dirs + sys.path
@@ -802,11 +802,11 @@ def py_filter_lines(module, function, lines, attrs={}):
     else:
         result = []
     if lines and not result:
-        message.warning('no output from filter: %s' % module)
+        g.message.warning('no output from filter: %s' % module)
         return lines
     return result
 
-def filter_lines(filter_cmd, lines, attrs={}):
+def filter_lines(g, filter_cmd, lines, attrs={}):
     """
     Run 'lines' through the 'filter_cmd' shell command and return the result.
     The 'attrs' dictionary contains additional filter attributes.
@@ -2805,9 +2805,10 @@ class Paragraph(AbstractBlock):
         template = subs_attrs(g,template,attrs)
         stag = g.config.section2tags(template, self.attributes,skipend=True)[0]
         if self.parameters.filter:
-            body = filter_lines(self.parameters.filter,body,self.attributes)
+            body = filter_lines(g,self.parameters.filter,body,self.attributes)
         if self.parameters.filter_module:
             body = py_filter_lines(
+                g,
                 self.parameters.filter_module,
                 self.parameters.filter_function,
                 body,
@@ -3175,9 +3176,10 @@ class DelimitedBlock(AbstractBlock):
                 postsubs = self.parameters.postsubs
                 body = self.g.lex.subs(body,presubs)
                 if self.parameters.filter:
-                    body = filter_lines(self.parameters.filter,body,self.attributes)
+                    body = filter_lines(g,self.parameters.filter,body,self.attributes)
                 if self.parameters.filter_module:
                     body = py_filter_lines(
+                        g,
                         self.parameters.filter_module,
                         self.parameters.filter_function,
                         body,
@@ -3597,7 +3599,8 @@ class Table(AbstractBlock):
             data = filter_lines(self.g,
                                 self.get_param('filter',colstyle),
                                 data, self.attributes)
-            data = py_filter_lines(self.get_param('filter_module',colstyle),
+            data = py_filter_lines(self.g,
+                                   self.get_param('filter_module',colstyle),
                                    self.get_param('filter_function',colstyle),
                                    data, self.attributes)
             data = self.g.lex.subs(data, postsubs)
@@ -4873,7 +4876,7 @@ class Config:
         command-line option (in which case it is loaded unconditionally).
         """
         # Load filters from modules
-        modules = config.conf_attrs.get('filter-modules')
+        modules = self.g.config.conf_attrs.get('filter-modules')
         if modules:
             for modname in modules.split('|'):
                 try:
