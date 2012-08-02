@@ -175,11 +175,12 @@ class AsciiDocAPI(object):
                 s = '%s=%s' % (k,v)
             opts('--attribute', s)
         args = [infile]
+        messages_out = []
         try:
             try:
-                self.asciidoc.execute(opts.values, args)
+                asciidoc.execute(opts.values, args, messages=messages_out)
             finally:
-                self.messages = self.asciidoc.messages[:]
+                self.messages = messages_out[:]
         except SystemExit, e:
             if e.code:
                 raise AsciiDocError(self.messages[-1])
