@@ -791,6 +791,8 @@ def py_filter_lines(module, function, lines, attrs={}):
         raise EAsciiDoc,'filter error: %s: %s' % (module, sys.exc_info()[1])
     if output and type(output) == unicode or type(output) == str:
         result = [s.rstrip() for s in output.split(os.linesep)]
+    elif isinstance(output, StringIO):
+        result = output.readlines()
     elif output:
         result = output
     else:
