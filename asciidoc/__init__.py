@@ -2205,7 +2205,7 @@ class FloatingTitle(Title):
     '''Floated titles are translated differently.'''
 
     def __init__(self, g):
-        self.g = g
+        Title.__init__(self, g)
 
     def isnext(self):
         return self.g.title.isnext() and self.g.attribute_list.style() == 'float'
@@ -2319,8 +2319,10 @@ class Section:
                 (g.title.level, g.title.attributes['title']))
         self.translate_body()
 
-    def translate_body(self,terminator=Title):
+    def translate_body(self,terminator=None):
         g = self.g
+        if not terminator:
+            terminator = g.title
         isempty = True
         next = g.lex.next()
         while next and next is not terminator:
