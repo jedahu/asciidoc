@@ -6121,7 +6121,7 @@ def show_help(g, topic, f=None):
             print >>f, line
 
 ### Used by asciidocapi.py ###
-def execute(opts,args,messages=[]):
+def execute(opts,args,g=None,messages=[]):
     """
     Execute asciidoc with command-line options and arguments.
     opts and args conform to values returned by getopt.getopt().
@@ -6146,8 +6146,9 @@ def execute(opts,args,messages=[]):
        >>>
 
     """
-    g = Global()
-    g.config.init()
+    if not g:
+        g = Global()
+        g.config.init()
     g.message.messages = messages
     if len(args) > 1:
         usage(g, 'Too many arguments')
@@ -6296,7 +6297,7 @@ def main():
     else:
         # Execute asciidoc.
         try:
-            execute(opts,args)
+            execute(opts,args,g=g)
         except KeyboardInterrupt:
             sys.exit(1)
 
