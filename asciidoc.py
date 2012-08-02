@@ -4846,6 +4846,21 @@ class Config:
         file unless the filter has been specified with the --filter
         command-line option (in which case it is loaded unconditionally).
         """
+        # Load filters from modules
+        modules = config.conf_attrs.get('filter-modules')
+        if modules:
+            for modname in modules.split('|'):
+                try:
+                    mod = importlib.import_module(modname.strip())
+                    for dirpath,dirnames,filenames in os.walk(mod.__path__):
+                        for f in filenames:
+                            if re.match(r'^.+\.conf$',f):
+                                self.load_file(f,dirpath)
+                except Exception:
+                    errmsg = 'failed to load filter-module config: %s: %s'
+                    raise EAsciiDoc,errmsg % (module, sys.exc_info()[1])
+
+        # Load filters from files
         if dirs is None:
             dirs = self.get_load_dirs()
         for d in dirs:
