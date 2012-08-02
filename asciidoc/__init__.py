@@ -770,6 +770,12 @@ def py_filter_lines(g, module, function, lines, attrs={}):
                   out.append(os.path.join(dir,'filters'))
         return out
 
+    def nested_execute(infile):
+        outfile = StringIO()
+        self.g.opts.append(('--out-file', outfile))
+        execute(self.g.opts, [infile], g=g, messages=g.messages)
+        return outfile
+
     # Default function name
     if not function:
       function = 'filter_asciidoc'
@@ -792,7 +798,12 @@ def py_filter_lines(g, module, function, lines, attrs={}):
         finally:
             sys.path = orig_sys_path
     try:
-        output = getattr(filter_mod, function)(lines, encoding=char_encoding(), **attrs)
+        output = getattr(filter_mod, function)(
+            nested_execute,
+            lines,
+            encoding=char_encoding(),
+            backend=document.getbackend(),
+            **attrs)
     except Exception:
         raise EAsciiDoc,'filter error: %s: %s' % (module, sys.exc_info()[1])
     if output and type(output) == unicode or type(output) == str:
@@ -6021,6 +6032,8 @@ class Global(object):
 
         self.blocknames = []
 
+        self.opts = None
+
 def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
     """Convert AsciiDoc document to DocBook document of type doctype
     The AsciiDoc document is read from file object src the translated
@@ -6246,6 +6259,7 @@ def execute(opts,args,g=None,messages=[]):
         g = Global()
         g.config.init()
     g.message.messages = messages
+    g.opts = opts
     if len(args) > 1:
         usage(g, 'Too many arguments')
         sys.exit(1)
