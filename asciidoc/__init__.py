@@ -751,7 +751,7 @@ def is_attr_defined(attrs,dic):
     else:
         return dic.get(attrs.strip()) is not None
 
-def py_filter_lines(g, module, function, lines, attrs={}):
+def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
     """
     Run 'lines' throught the 'filter_src' python code and return the result,
     optionally loading a 'filter_py' file first.
@@ -797,12 +797,17 @@ def py_filter_lines(g, module, function, lines, attrs={}):
             raise EAsciiDoc,'failed to import filter: %s: %s' % (module, sys.exc_info()[1])
         finally:
             sys.path = orig_sys_path
+    kw_attrs = {}
+    for key in kwargs:
+      if key in attrs:
+        kw_attrs[key] = attrs[key]
     filter_fn = getattr(filter_mod, function)
     output = filter_fn(
         nested_execute,
         lines,
         backend=g.document.getbackend(),
-        **attrs)
+        encoding=attrs.get('encoding', g.document.attributes.get('encoding', 'utf-8')),
+        **kw_attrs)
     if output and type(output) == unicode or type(output) == str:
         result = [s.rstrip() for s in output.split(os.linesep)]
     elif isinstance(output, StringIO):
@@ -2411,7 +2416,7 @@ class AbstractBlock:
         # Configuration parameter names common to all blocks.
         self.CONF_ENTRIES = ('delimiter','options','subs','presubs','postsubs',
                              'posattrs','style','.*-style','template','filter',
-                             'filter_module', 'filter_function')
+                             'filter_module', 'filter_function', 'filter_kwargs')
         self.start = None   # File reader cursor at start delimiter.
         self.defname=None   # Configuration file block definition section name.
         # Configuration parameters.
@@ -2424,6 +2429,7 @@ class AbstractBlock:
         self.filter=None    # filter entry.
         self.filter_module=None # python filter module
         self.filter_function=None # python filter function
+        self.filter_kwargs=None # python filter keyword arg names
         self.posattrs=()    # posattrs entry list.
         self.style=None     # Default style.
         self.styles=OrderedDict() # Each entry is a styles dictionary.
@@ -2435,7 +2441,7 @@ class AbstractBlock:
         self.attributes={}
         # The names of block parameters.
         self.PARAM_NAMES=('template','options','presubs','postsubs','filter',
-                          'filter_module', 'filter_function')
+                          'filter_module', 'filter_function', 'filter_kwargs')
         self.parameters=None
         # Leading delimiter match object.
         self.mo=None
@@ -2479,7 +2485,7 @@ class AbstractBlock:
                 if not is_name(v):
                     raise EAsciiDoc, msg % (k,v)
                 copy(dst,k,v)
-            elif k in ('filter', 'filter_module', 'filter_function'):
+            elif k in ('filter', 'filter_module', 'filter_function', 'filter_kwargs'):
                 copy(dst,k,v)
             elif k == 'options':
                 if isinstance(v,str):
@@ -2565,6 +2571,8 @@ class AbstractBlock:
             write('filter_module='+self.filter_module)
         if self.filter_function:
             write('filter_function='+self.filter_function)
+        if self.filter_kwargs:
+            write('filter_kwargs='+self.filter_kwargs)
         if self.posattrs:
             write('posattrs='+','.join(self.posattrs))
         if self.style:
@@ -2821,6 +2829,7 @@ class Paragraph(AbstractBlock):
                 g,
                 self.parameters.filter_module,
                 self.parameters.filter_function,
+                self.parameters.filter_kwargs,
                 body,
                 self.attributes)
         body = g.lex.subs(body,postsubs)
@@ -3192,6 +3201,7 @@ class DelimitedBlock(AbstractBlock):
                         g,
                         self.parameters.filter_module,
                         self.parameters.filter_function,
+                        self.parameters.filter_kwargs,
                         body,
                         self.attributes)
                 body = self.g.lex.subs(body,postsubs)
@@ -3612,6 +3622,7 @@ class Table(AbstractBlock):
             data = py_filter_lines(self.g,
                                    self.get_param('filter_module',colstyle),
                                    self.get_param('filter_function',colstyle),
+                                   self.get_param('filter_kwargs',colstyle),
                                    data, self.attributes)
             data = self.g.lex.subs(data, postsubs)
             if rowtype != 'header':
