@@ -801,8 +801,8 @@ def py_filter_lines(g, module, function, lines, attrs={}):
         output = getattr(filter_mod, function)(
             nested_execute,
             lines,
-            encoding=char_encoding(),
-            backend=document.getbackend(),
+            encoding=char_encoding(g),
+            backend=g.document.getbackend(),
             **attrs)
     except Exception:
         raise EAsciiDoc,'filter error: %s: %s' % (module, sys.exc_info()[1])
