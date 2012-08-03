@@ -145,7 +145,7 @@ class AsciiDocAPI(object):
     """
     AsciiDoc API class.
     """
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Locate and import asciidoc.py.
         Initialize instance attributes.
