@@ -6152,7 +6152,7 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
         # Build outfile name.
         if outfile is None:
             outfile = os.path.splitext(infile)[0] + '.' + g.document.backend
-            if self.g.config.outfilesuffix:
+            if g.config.outfilesuffix:
                 # Change file extension.
                 outfile = os.path.splitext(outfile)[0] + g.config.outfilesuffix
         g.document.outfile = outfile
