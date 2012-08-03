@@ -773,8 +773,10 @@ def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
 
     def nested_execute(infile):
         outfile = StringIO()
-        self.g.opts.append(('--out-file', outfile))
-        execute(self.g.opts, [infile], g=g, messages=g.messages)
+        opts = g.opts[:]
+        opts.append(('--out-file', outfile))
+        #opts.append(('--no-header-footer',None))
+        execute(opts, [infile], messages=g.message.messages)
         return outfile
 
     # Default function name
