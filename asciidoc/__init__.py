@@ -814,6 +814,7 @@ def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
     if output and type(output) == unicode or type(output) == str:
         result = [s.rstrip() for s in output.split(os.linesep)]
     elif isinstance(output, StringIO):
+        output.seek(0)
         result = output.readlines()
     elif output:
         result = output
