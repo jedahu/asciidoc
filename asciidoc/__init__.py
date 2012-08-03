@@ -801,7 +801,6 @@ def py_filter_lines(g, module, function, lines, attrs={}):
         output = getattr(filter_mod, function)(
             nested_execute,
             lines,
-            encoding=char_encoding(g),
             backend=g.document.getbackend(),
             **attrs)
     except Exception:
