@@ -6331,7 +6331,7 @@ def execute(opts,args,g=None,messages=[]):
         infile = args[0]
         if infile == '-':
             infile = '<stdin>'
-        elif isinstance(infile, str):
+        elif isinstance(infile, str) or isinstance(infile, unicode):
             infile = os.path.abspath(infile)
         else:   # Input file is file object from API call.
             sys.stdin = infile
