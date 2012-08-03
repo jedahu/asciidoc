@@ -4901,18 +4901,18 @@ class Config:
         command-line option (in which case it is loaded unconditionally).
         """
         # Load filters from modules
-        modules = self.g.config.conf_attrs.get('filter-modules')
+        modules = self.g.document.attributes.get('filter-modules')
         if modules:
             for modname in modules.split('|'):
-                try:
+        #        try:
                     mod = importlib.import_module(modname.strip())
-                    for dirpath,dirnames,filenames in os.walk(mod.__path__):
+                    for dirpath,dirnames,filenames in os.walk(mod.__path__[0]):
                         for f in filenames:
                             if re.match(r'^.+\.conf$',f):
                                 self.load_file(f,dirpath)
-                except Exception:
-                    errmsg = 'failed to load filter-module config: %s: %s'
-                    raise EAsciiDoc,errmsg % (module, sys.exc_info()[1])
+        #        except Exception:
+        #            errmsg = 'failed to load filter-module config: %s: %s'
+        #            raise EAsciiDoc,errmsg % (modname, sys.exc_info()[1])
 
         # Load filters from files
         if dirs is None:
