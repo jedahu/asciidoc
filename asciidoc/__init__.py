@@ -7,6 +7,7 @@ under the terms of the GNU General Public License (GPL).
 """
 
 import sys, os, re, time, traceback, tempfile, subprocess, codecs, locale, unicodedata, copy, importlib
+from StringIO import StringIO
 
 ### Used by asciidocapi.py ###
 VERSION = '8.6.8'           # See CHANGLOG file for version history.
