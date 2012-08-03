@@ -3,7 +3,7 @@ from pygments.formatters.html import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
 from os import linesep
 
-def filter(lines, encoding='utf-8', language='text', src_numbered=False, **attrs):
+def filter(_, lines, encoding='utf-8', language='text', src_numbered=False, **attrs):
   return highlight(
       linesep.join(lines),
       get_lexer_by_name(language, encoding=encoding),
