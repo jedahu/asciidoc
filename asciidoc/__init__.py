@@ -771,12 +771,12 @@ def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
                   out.append(os.path.join(dir,'filters'))
         return out
 
-    def nested_execute(infile):
+    def nested_execute(infile, outfile, **kwargs):
         outfile = StringIO()
-        opts = g.opts[:]
-        opts.append(('--out-file', outfile))
-        #opts.append(('--no-header-footer',None))
-        execute(opts, [infile], messages=g.message.messages)
+        args = {}
+        args.update(g.args)
+        args.update(kwargs)
+        execute(infile, outfile, **args)
         return outfile
 
     # Default function name
@@ -806,8 +806,8 @@ def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
         kw_attrs[key] = attrs[key]
     filter_fn = getattr(filter_mod, function)
     output = filter_fn(
-        nested_execute,
         lines,
+        asciidoc_fn=nested_execute,
         backend=g.document.getbackend(),
         encoding=attrs.get('encoding', g.document.attributes.get('encoding', 'utf-8')),
         **kw_attrs)
@@ -1520,8 +1520,9 @@ class Document(object):
 
     def __init__(self, g):
         self.g = g
-        self.infile = None      # Source file name.
-        self.outfile = None     # Output file name.
+        self.infile = None      # Source file
+        self.outfile = None     # Output file
+        self.inpath = None      # Source file path
         self.attributes = InsensitiveDict()
         self.level = 0          # 0 => front matter. 1,2,3 => sect1,2,3.
         self.has_errors = False # Set true if processing errors were flagged.
@@ -1555,31 +1556,31 @@ class Document(object):
         self.g.config.load_miscellaneous(self.g.config.cmd_attrs)
         self.attributes['newline'] = self.g.config.newline
         # File name related attributes can't be overridden.
-        if self.infile is not None:
-            if self.infile and os.path.exists(self.infile):
-                t = os.path.getmtime(self.infile)
-            elif self.infile == '<stdin>':
+        if self.infile:
+            if self.infile and os.path.exists(self.inpath):
+                t = os.path.getmtime(self.inpath)
+            elif not self.inpath:
                 t = time.time()
             else:
                 t = None
             if t:
                 self.attributes['doctime'] = time_str(t)
                 self.attributes['docdate'] = date_str(t)
-            if self.infile != '<stdin>':
+            if self.inpath:
                 self.attributes['infile'] = self.infile
-                self.attributes['indir'] = os.path.dirname(self.infile)
+                self.attributes['indir'] = os.path.dirname(self.inpath)
                 self.attributes['docfile'] = self.infile
-                self.attributes['docdir'] = os.path.dirname(self.infile)
+                self.attributes['docdir'] = os.path.dirname(self.inpath)
                 self.attributes['docname'] = os.path.splitext(
-                        os.path.basename(self.infile))[0]
+                        os.path.basename(self.inpath))[0]
         if self.outfile:
-            if self.outfile != '<stdout>':
+            if self.outpath:
                 self.attributes['outfile'] = self.outfile
-                self.attributes['outdir'] = os.path.dirname(self.outfile)
-                if self.infile == '<stdin>':
+                self.attributes['outdir'] = os.path.dirname(self.outpath)
+                if not self.inpath:
                     self.attributes['docname'] = os.path.splitext(
-                            os.path.basename(self.outfile))[0]
-                ext = os.path.splitext(self.outfile)[1][1:]
+                            os.path.basename(self.outpath))[0]
+                ext = os.path.splitext(self.outpath)[1][1:]
             elif self.g.config.outfilesuffix:
                 ext = self.g.config.outfilesuffix[1:]
             else:
@@ -4236,17 +4237,19 @@ class Reader1:
         self.bom = None         # Byte order mark (BOM).
         self.infile = None      # Saved document 'infile' attribute.
         self.indir = None       # Saved document 'indir' attribute.
-    def open(self,fname):
+    def open(self,f,fname=None):
         self.fname = fname
-        self.g.message.verbose('reading: '+fname)
-        if fname == '<stdin>':
-            self.f = sys.stdin
-            self.infile = None
-            self.indir = None
+        if f:
+            self.f = f
         else:
-            self.f = open(fname,'rb')
+            self.f = open(fname, 'rb')
+        if fname:
+            self.g.message.verbose('reading: '+fname)
             self.infile = fname
             self.indir = os.path.dirname(fname)
+        else:
+            self.infile = None
+            self.indir = None
         self.g.document.attributes['infile'] = self.infile
         self.g.document.attributes['indir'] = self.indir
         self._lineno = 0            # The last line read from file object f.
@@ -4355,7 +4358,7 @@ class Reader1:
                         raise EAsciiDoc, "include macro: illegal 'depth' argument"
                 # Process included file.
                 self.g.message.verbose('include: ' + fname, linenos=False)
-                self.open(fname)
+                self.open(None, fname=fname)
                 self.current_depth = self.current_depth + 1
                 result = Reader1.read(self)
         else:
@@ -4561,22 +4564,20 @@ class Writer:
         self.fname = None                # Output file name.
         self.lines_out = 0               # Number of lines written.
         self.skip_blank_lines = False    # If True don't output blank lines.
-    def open(self,fname,bom=None):
+    def open(self,f,fname,bom=None):
         '''
         bom is optional byte order mark.
         http://en.wikipedia.org/wiki/Byte-order_mark
         '''
+        self.f = f
         self.fname = fname
-        if fname == '<stdout>':
-            self.f = sys.stdout
-        else:
-            self.f = open(fname,'wb+')
-        self.g.message.verbose('writing: '+self.g.writer.fname,False)
+        if fname:
+            self.g.message.verbose('writing: '+self.g.writer.fname,False)
         if bom:
             self.f.write(bom)
         self.lines_out = 0
     def close(self):
-        if self.fname != '<stdout>':
+        if self.fname:
             self.f.close()
     def write_line(self, line=None):
         if not (self.skip_blank_lines and (not line or not line.strip())):
@@ -4735,7 +4736,7 @@ class Config:
             return True
         rdr = Reader(self.g)  # Reader processes system macros.
         self.g.message.linenos = False         # Disable document line numbers.
-        rdr.open(fname)
+        rdr.open(None, fname=fname)
         self.g.message.linenos = None
         self.fname = fname
         reo = re.compile(r'(?u)^\[(?P<section>\+?[^\W\d][\w-]*)\]\s*$')
@@ -5893,21 +5894,24 @@ class Plugin:
     """
     CMDS = ('install','remove','list','build')
 
-    type = None     # 'backend', 'filter' or 'theme'.
+    def __init__(self, g, type):
+        self.g = g
+        self.type = type     # 'backend', 'filter' or 'theme'.
 
-    @staticmethod
-    def get_dir():
+    def run(self, cmd, args):
+        getattr(self, cmd)(args)
+
+    def get_dir(self):
         """
         Return plugins path (.asciidoc/filters or .asciidoc/themes) in user's
         home direcory or None if user home not defined.
         """
         result = userdir()
         if result:
-            result = os.path.join(result, Plugin.type+'s')
+            result = os.path.join(result, self.type+'s')
         return result
 
-    @staticmethod
-    def install(args):
+    def install(self, args):
         """
         Install plugin Zip file.
         args[0] is plugin zip file path.
@@ -5915,39 +5919,38 @@ class Plugin:
         """
         if len(args) not in (1,2):
             die('invalid number of arguments: --%s install %s'
-                    % (Plugin.type, ' '.join(args)))
+                    % (self.type, ' '.join(args)))
         zip_file = args[0]
         if not os.path.isfile(zip_file):
             die('file not found: %s' % zip_file)
         reo = re.match(r'^\w+',os.path.split(zip_file)[1])
         if not reo:
             die('file name does not start with legal %s name: %s'
-                    % (Plugin.type, zip_file))
+                    % (self.type, zip_file))
         plugin_name = reo.group()
         if len(args) == 2:
             plugins_dir = args[1]
             if not os.path.isdir(plugins_dir):
                 die('directory not found: %s' % plugins_dir)
         else:
-            plugins_dir = Plugin.get_dir()
+            plugins_dir = self.get_dir()
             if not plugins_dir:
                 die('user home directory is not defined')
         plugin_dir = os.path.join(plugins_dir, plugin_name)
         if os.path.exists(plugin_dir):
-            die('%s is already installed: %s' % (Plugin.type, plugin_dir))
+            die('%s is already installed: %s' % (self.type, plugin_dir))
         try:
             os.makedirs(plugin_dir)
         except Exception,e:
-            die('failed to create %s directory: %s' % (Plugin.type, str(e)))
+            die('failed to create %s directory: %s' % (self.type, str(e)))
         try:
             extract_zip(zip_file, plugin_dir)
         except Exception,e:
             if os.path.isdir(plugin_dir):
                 shutil.rmtree(plugin_dir)
-            die('failed to extract %s: %s' % (Plugin.type, str(e)))
+            die('failed to extract %s: %s' % (self.type, str(e)))
 
-    @staticmethod
-    def remove(args):
+    def remove(self, args):
         """
         Delete plugin directory.
         args[0] is plugin name.
@@ -5955,39 +5958,37 @@ class Plugin:
         """
         if len(args) not in (1,2):
             die('invalid number of arguments: --%s remove %s'
-                    % (Plugin.type, ' '.join(args)))
+                    % (self.type, ' '.join(args)))
         plugin_name = args[0]
         if not re.match(r'^\w+$',plugin_name):
-            die('illegal %s name: %s' % (Plugin.type, plugin_name))
+            die('illegal %s name: %s' % (self.type, plugin_name))
         if len(args) == 2:
             d = args[1]
             if not os.path.isdir(d):
                 die('directory not found: %s' % d)
         else:
-            d = Plugin.get_dir()
+            d = self.get_dir()
             if not d:
                 die('user directory is not defined')
         plugin_dir = os.path.join(d, plugin_name)
         if not os.path.isdir(plugin_dir):
-            die('cannot find %s: %s' % (Plugin.type, plugin_dir))
+            die('cannot find %s: %s' % (self.type, plugin_dir))
         try:
             self.g.message.verbose('removing: %s' % plugin_dir)
             shutil.rmtree(plugin_dir)
         except Exception,e:
-            die('failed to delete %s: %s' % (Plugin.type, str(e)))
+            die('failed to delete %s: %s' % (self.type, str(e)))
 
-    @staticmethod
-    def list(args):
+    def list(self, args):
         """
         List all plugin directories (global and local).
         """
-        for d in [os.path.join(d, Plugin.type+'s') for d in self.g.config.get_load_dirs()]:
+        for d in [os.path.join(d, self.type+'s') for d in self.g.config.get_load_dirs()]:
             if os.path.isdir(d):
                 for f in os.walk(d).next()[1]:
                     self.g.message.stdout(os.path.join(d,f))
 
-    @staticmethod
-    def build(args):
+    def build(self, args):
         """
         Create plugin Zip file.
         args[0] is Zip file name.
@@ -5995,7 +5996,7 @@ class Plugin:
         """
         if len(args) != 2:
             die('invalid number of arguments: --%s build %s'
-                    % (Plugin.type, ' '.join(args)))
+                    % (self.type, ' '.join(args)))
         zip_file = args[0]
         plugin_source = args[1]
         if not (os.path.isdir(plugin_source) or os.path.isfile(plugin_source)):
@@ -6046,9 +6047,9 @@ class Global(object):
 
         self.blocknames = []
 
-        self.opts = None
+        self.args = {}
 
-def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
+def asciidoc(g, backend, doctype, confiles, infile, outfile, no_conf, inpath, outpath):
     """Convert AsciiDoc document to DocBook document of type doctype
     The AsciiDoc document is read from file object src the translated
     DocBook file written to file object dst."""
@@ -6070,13 +6071,8 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
                 raise EAsciiDoc,'missing filter: %s' % f
         if doctype not in (None,'article','manpage','book'):
             raise EAsciiDoc,'illegal document type'
-        # Set processing options.
-        for o in options:
-            if o == '-c': g.config.dumping = True
-            if o == '-s': g.config.header_footer = False
-            if o == '-v': g.config.verbose = True
         g.document.update_attributes()
-        if '-e' not in options:
+        if not no_conf:
             # Load asciidoc.conf files in two passes: the first for attributes
             # the second for everything. This is so that locally set attributes
             # available are in the global asciidoc.conf
@@ -6084,28 +6080,25 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
                 raise EAsciiDoc,'configuration file asciidoc.conf missing'
             load_conffiles(include=['attributes'])
             g.config.load_from_dirs('asciidoc.conf')
-            if infile != '<stdin>':
-                indir = os.path.dirname(infile)
+            if inpath and os.path.isfile(inpath):
+                indir = os.path.dirname(inpath)
                 g.config.load_file('asciidoc.conf', indir,
                                 include=['attributes','titles','specialchars'])
         else:
             load_conffiles(include=['attributes','titles','specialchars'])
         g.document.update_attributes()
-        # Check the infile exists.
-        if infile != '<stdin>':
-            if not os.path.isfile(infile):
-                raise EAsciiDoc,'input file %s missing' % infile
         g.document.infile = infile
+        g.document.inpath = inpath
         g.attribute_list.initialize()
         # Open input file and parse document header.
         g.reader.tabsize = g.config.tabsize
-        g.reader.open(infile)
+        g.reader.open(infile, fname=inpath)
         has_header = g.document.parse_header(doctype,backend)
         # doctype is now finalized.
         g.document.attributes['doctype-'+g.document.doctype] = ''
         g.config.set_theme_attributes()
         # Load backend configuration files.
-        if '-e' not in options:
+        if not no_conf:
             f = g.document.backend + '.conf'
             conffile = g.config.load_backend()
             if not conffile:
@@ -6115,7 +6108,7 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
         g.document.attributes['backend-'+g.document.backend] = ''
         g.document.attributes[g.document.backend+'-'+g.document.doctype] = ''
         doc_conffiles = []
-        if '-e' not in options:
+        if not no_conf:
             # Load filters and language file.
             g.config.load_filters()
             g.document.load_lang()
@@ -6125,7 +6118,7 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
                 g.config.load_backend([indir])
                 g.config.load_filters([indir])
                 # Load document specific configuration files.
-                f = os.path.splitext(infile)[0]
+                f = os.path.splitext(inpath)[0]
                 doc_conffiles = [
                         f for f in (f+'.conf', f+'-'+g.document.backend+'.conf')
                         if os.path.isfile(f) ]
@@ -6149,13 +6142,8 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
             else:
                 args += ' --attribute "%s"' % k
         g.document.attributes['asciidoc-args'] = args
-        # Build outfile name.
-        if outfile is None:
-            outfile = os.path.splitext(infile)[0] + '.' + g.document.backend
-            if g.config.outfilesuffix:
-                # Change file extension.
-                outfile = os.path.splitext(outfile)[0] + g.config.outfilesuffix
         g.document.outfile = outfile
+        g.document.outpath = outpath
         # Document header attributes override conf file attributes.
         g.document.attributes.update(g.attribute_entry.attributes)
         g.document.update_attributes()
@@ -6173,7 +6161,7 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
         else:
             g.writer.newline = g.config.newline
             try:
-                g.writer.open(outfile, g.reader.bom)
+                g.writer.open(outfile, outpath, g.reader.bom)
                 try:
                     g.document.translate(has_header) # Generate the output.
                 finally:
@@ -6184,8 +6172,8 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, options):
         raise
     except Exception,e:
         # Cleanup.
-        if outfile and outfile != '<stdout>' and os.path.isfile(outfile):
-            os.unlink(outfile)
+        if outpath and os.path.isfile(outpath):
+            os.unlink(outpath)
         # Build and print error description.
         msg = 'FAILED: '
         if g.reader.cursor:
@@ -6244,7 +6232,21 @@ def show_help(g, topic, f=None):
             print >>f, line
 
 ### Used by asciidocapi.py ###
-def execute(opts,args,g=None,messages=[]):
+def execute(infile, outfile,
+        messages=[],
+        inpath=None,
+        outpath=None,
+        backend='html',
+        safe=False,
+        dump_conf=False,
+        doctype='article',
+        no_conf=False,
+        conf_files=[],
+        filters=[],
+        attrs={},
+        default_attrs={},
+        no_header_footer=False,
+        verbose=False):
     """
     Execute asciidoc with command-line options and arguments.
     opts and args conform to values returned by getopt.getopt().
@@ -6269,161 +6271,33 @@ def execute(opts,args,g=None,messages=[]):
        >>>
 
     """
-    if not g:
-        g = Global()
-        g.config.init()
-    g.message.messages = messages
-    g.opts = opts
-    if len(args) > 1:
-        usage(g, 'Too many arguments')
-        sys.exit(1)
-    backend = None
-    doctype = None
-    confiles = []
-    outfile = None
-    options = []
-    help_option = False
-    for o,v in opts:
-        if o in ('--help','-h'):
-            help_option = True
-        #DEPRECATED: --unsafe option.
-        if o == '--unsafe':
-            g.document.safe = False
-        if o == '--safe':
-            g.document.safe = True
-        if o == '--version':
-            print('asciidoc %s' % VERSION)
-            sys.exit(0)
-        if o in ('-b','--backend'):
-            backend = v
-        if o in ('-c','--dump-conf'):
-            options.append('-c')
-        if o in ('-d','--doctype'):
-            doctype = v
-        if o in ('-e','--no-conf'):
-            options.append('-e')
-        if o in ('-f','--conf-file'):
-            confiles.append(v)
-        if o == '--filter':
-            g.config.filters.append(v)
-        if o in ('-n','--section-numbers'):
-            o = '-a'
-            v = 'numbered'
-        if o == '--theme':
-            o = '-a'
-            v = 'theme='+v
-        if o in ('-a','--attribute'):
-            e = parse_entry(v, allow_name_only=True)
-            if not e:
-                usage(g, 'Illegal -a option: %s' % v)
-                sys.exit(1)
-            k,v = e
-            # A @ suffix denotes don't override existing document attributes.
-            if v and v[-1] == '@':
-                g.document.attributes[k] = v[:-1]
-            else:
-                g.config.cmd_attrs[k] = v
-        if o in ('-o','--out-file'):
-            outfile = v
-        if o in ('-s','--no-header-footer'):
-            options.append('-s')
-        if o in ('-v','--verbose'):
-            options.append('-v')
-    if help_option:
-        if len(args) == 0:
-            show_help('default')
-        else:
-            show_help(args[-1])
-        sys.exit(0)
-    if len(args) == 0 and len(opts) == 0:
-        usage(g)
-        sys.exit(0)
-    if len(args) == 0:
-        usage(g, 'No source file specified')
-        sys.exit(1)
-    stdin,stdout = sys.stdin,sys.stdout
-    try:
-        infile = args[0]
-        if infile == '-':
-            infile = '<stdin>'
-        elif isinstance(infile, str) or isinstance(infile, unicode):
-            infile = os.path.abspath(infile)
-        else:   # Input file is file object from API call.
-            sys.stdin = infile
-            infile = '<stdin>'
-        if outfile == '-':
-            outfile = '<stdout>'
-        elif isinstance(outfile, str):
-            outfile = os.path.abspath(outfile)
-        elif outfile is None:
-            if infile == '<stdin>':
-                outfile = '<stdout>'
-        else:   # Output file is file object from API call.
-            sys.stdout = outfile
-            outfile = '<stdout>'
-        # Do the work.
-        asciidoc(g, backend, doctype, confiles, infile, outfile, options)
-        if g.document.has_errors:
-            sys.exit(1)
-    finally:
-        sys.stdin,sys.stdout = stdin,stdout
-
-def main():
-    # Process command line options.
     g = Global()
     g.config.init()
-    import getopt
-    try:
-        #DEPRECATED: --unsafe option.
-        opts,args = getopt.getopt(sys.argv[1:],
-            'a:b:cd:ef:hno:svw:',
-            ['attribute=','backend=','conf-file=','doctype=','dump-conf',
-            'help','no-conf','no-header-footer','out-file=',
-            'section-numbers','verbose','version','safe','unsafe',
-            'doctest','filter=','theme='])
-    except getopt.GetoptError:
-        g.message.stderr('illegal command options')
-        sys.exit(1)
-    opt_names = [opt[0] for opt in opts]
-    if '--doctest' in opt_names:
-        # Run module doctests.
-        import doctest
-        options = doctest.NORMALIZE_WHITESPACE + doctest.ELLIPSIS
-        failures,tries = doctest.testmod(optionflags=options)
-        if failures == 0:
-            g.message.stderr('All doctests passed')
-            sys.exit(0)
-        else:
-            sys.exit(1)
-    # Look for plugin management commands.
-    count = 0
-    cmd = None
-    for o,v in opts:
-        if o in ('-b','--backend','--filter','--theme'):
-            if o == '-b':
-                o = '--backend'
-            plugin = o[2:]
-            cmd = v
-            if cmd not in Plugin.CMDS:
-                continue
-            count += 1
-    if count > 1:
-        die('--backend, --filter and --theme options are mutually exclusive')
-    if count == 1:
-        # Execute plugin management commands.
-        if not cmd:
-            die('missing --%s command' % plugin)
-        if cmd not in Plugin.CMDS:
-            die('illegal --%s command: %s' % (plugin, cmd))
-        Plugin.type = plugin
-        g.config.verbose = bool(set(['-v','--verbose']) & set(opt_names))
-        getattr(Plugin,cmd)(args)
-    else:
-        # Execute asciidoc.
-        try:
-            execute(opts,args,g=g)
-        except KeyboardInterrupt:
-            sys.exit(1)
+    g.args = dict(
+        messages=messages,
+        inpath=inpath,
+        outpath=outpath,
+        backend=backend,
+        safe=safe,
+        dump_conf=dump_conf,
+        doctype=doctype,
+        no_conf=no_conf,
+        conf_files=conf_files,
+        filters=filters,
+        attrs=attrs,
+        default_attrs=default_attrs,
+        no_header_footer=no_header_footer,
+        verbose=verbose
+        )
+    g.message.messages = messages
+    g.document.safe = safe
+    g.config.filters.extend(filters)
+    g.document.attributes.update(default_attrs)
+    g.config.cmd_attrs.update(attrs)
+    g.config.dumping = dump_conf
+    g.config.header_footer = not no_header_footer
+    g.config.verbose = verbose
 
-if __name__ == '__main__':
-    main()
+    asciidoc(g, backend, doctype, conf_files, infile, outfile, no_conf, inpath, outpath)
+    if g.document.has_errors:
+        raise EAsciiDoc, 'document contains errors'

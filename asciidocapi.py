@@ -52,7 +52,7 @@ under the terms of the GNU General Public License (GPL).
 
 """
 
-import sys,os,re,imp,asciidoc
+import sys,os,re,imp,asciidoc,asciidoc.cmdline
 
 API_VERSION = '0.1.2'
 MIN_ASCIIDOC_VERSION = '8.4.1'  # Minimum acceptable AsciiDoc version.
@@ -174,17 +174,12 @@ class AsciiDocAPI(object):
             else:
                 s = '%s=%s' % (k,v)
             opts('--attribute', s)
-        args = [infile]
+        args = [infile, outfile]
         messages_out = []
         try:
-            try:
-                asciidoc.execute(opts.values, args, messages=messages_out)
-            finally:
-                self.messages = messages_out[:]
-        except SystemExit, e:
-            if e.code:
-                raise AsciiDocError(self.messages[-1])
-
+            asciidoc.cmdline.exec_cmdline(opts.values, args, messages_out)
+        finally:
+            self.messages = messages_out[:]
 
 if __name__ == "__main__":
     """
