@@ -54,7 +54,7 @@ def exec_cmdline(opts, args, messages_out):
     inpath = None
     outpath = None
     fst = args[0]
-    snd = args[1]
+    snd = args[1] if len(args) > 1 else None
     try:
         if fst == '-':
             infile = sys.stdin

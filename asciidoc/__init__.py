@@ -211,7 +211,10 @@ class Message:
         if self.linenos is not False and ((linenos or self.linenos) and self.g.reader.cursor):
             if cursor is None:
                 cursor = self.g.reader.cursor
-            prefix += '%s: line %d: ' % (os.path.basename(cursor[0]),cursor[1]+offset)
+            fname = cursor[0]
+            if not fname:
+                fname = '<stdin>'
+            prefix += '%s: line %d: ' % (os.path.basename(fname),cursor[1]+offset)
         return prefix + msg
 
     def error(self, msg, cursor=None, halt=False):
@@ -271,7 +274,7 @@ def is_safe_file(g, fname, directory=None):
     if directory is None:
         if g.document.infile == '<stdin>':
            return not safe(g)
-        directory = os.path.dirname(g.document.infile)
+        directory = os.path.dirname(g.document.inpath)
     elif directory == '':
         directory = '.'
     return (
@@ -752,6 +755,25 @@ def is_attr_defined(attrs,dic):
     else:
         return dic.get(attrs.strip()) is not None
 
+def nested_execute_fn(g):
+    def nested_execute(infile, outfile, **kwargs):
+        args = {}
+        args.update(g.args)
+        args.update(kwargs)
+        args['no_header_footer'] = True
+        args['attrs'].update(g.attribute_entry.attributes)
+        if 'title' in args:
+            del args['title']
+        execute(infile, outfile, **args)
+    return nested_execute
+
+def nested_asciidoc_filter(lines, asciidoc_fn=None):
+    infile = StringIO(''.join(lines))
+    outfile = StringIO()
+    asciidoc_fn(infile, outfile)
+    outfile.seek(0)
+    return outfile
+
 def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
     """
     Run 'lines' throught the 'filter_src' python code and return the result,
@@ -770,14 +792,6 @@ def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
               else:
                   out.append(os.path.join(dir,'filters'))
         return out
-
-    def nested_execute(infile, outfile, **kwargs):
-        outfile = StringIO()
-        args = {}
-        args.update(g.args)
-        args.update(kwargs)
-        execute(infile, outfile, **args)
-        return outfile
 
     # Default function name
     if not function:
@@ -800,22 +814,31 @@ def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
             raise EAsciiDoc,'failed to import filter: %s: %s' % (module, sys.exc_info()[1])
         finally:
             sys.path = orig_sys_path
+    attrs['asciidoc_fn'] = nested_execute_fn(g)
+    attrs['backend'] = g.document.getbackend()
+    if 'encoding' not in attrs:
+        attrs['encoding'] = g.document.attributes.get('encoding', 'utf-8')
     kw_attrs = {}
     for key in kwargs:
-      if key in attrs:
-        kw_attrs[key] = attrs[key]
+        if key in attrs:
+            kw_attrs[key] = attrs[key]
+        elif key in g.document.attributes:
+            kw_attrs[key] = g.document.attributes[key]
     filter_fn = getattr(filter_mod, function)
-    output = filter_fn(
-        lines,
-        asciidoc_fn=nested_execute,
-        backend=g.document.getbackend(),
-        encoding=attrs.get('encoding', g.document.attributes.get('encoding', 'utf-8')),
-        **kw_attrs)
+    output = filter_fn(lines, **kw_attrs)
     if output and type(output) == unicode or type(output) == str:
         result = [s.rstrip() for s in output.split(os.linesep)]
     elif isinstance(output, StringIO):
         output.seek(0)
-        result = output.readlines()
+        result = []
+        for line in output.readlines():
+            if line.endswith("\r\n"):
+                result.append(line[:-2])
+            elif line.endswith("\n"):
+                result.append(line[:-1])
+            else:
+                result.append(line)
+        #result = output.readlines()
     elif output:
         result = output
     else:
@@ -1557,7 +1580,7 @@ class Document(object):
         self.attributes['newline'] = self.g.config.newline
         # File name related attributes can't be overridden.
         if self.infile:
-            if self.infile and os.path.exists(self.inpath):
+            if self.inpath and os.path.exists(self.inpath):
                 t = os.path.getmtime(self.inpath)
             elif not self.inpath:
                 t = time.time()
@@ -1569,7 +1592,7 @@ class Document(object):
             if self.inpath:
                 self.attributes['infile'] = self.infile
                 self.attributes['indir'] = os.path.dirname(self.inpath)
-                self.attributes['docfile'] = self.infile
+                self.attributes['docfile'] = self.inpath
                 self.attributes['docdir'] = os.path.dirname(self.inpath)
                 self.attributes['docname'] = os.path.splitext(
                         os.path.basename(self.inpath))[0]
@@ -1656,7 +1679,7 @@ class Document(object):
         specified.
         """
         g = self.g
-        assert self.level == 0
+        #WIP assert self.level == 0
         # Skip comments and attribute entries that preceed the header.
         self.consume_attributes_and_comments()
         if doctype is not None:
@@ -4307,7 +4330,7 @@ class Reader1:
                 fname = subs_attrs(self.g,mo.group('target'))
                 if not fname:
                     return Reader1.read(self)   # Return next input line.
-                if self.fname != '<stdin>':
+                if self.fname:
                     fname = os.path.expandvars(os.path.expanduser(fname))
                     fname = safe_filename(self.g, fname, os.path.dirname(self.fname))
                     if not fname:
@@ -6112,7 +6135,7 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, no_conf, inpath, ou
             # Load filters and language file.
             g.config.load_filters()
             g.document.load_lang()
-            if infile != '<stdin>':
+            if inpath:
                 # Load local conf files (files in the source file directory).
                 g.config.load_file('asciidoc.conf', indir)
                 g.config.load_backend([indir])
@@ -6170,26 +6193,28 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, no_conf, inpath, ou
                 g.reader.closefile()
     except KeyboardInterrupt:
         raise
-    except Exception,e:
-        # Cleanup.
-        if outpath and os.path.isfile(outpath):
-            os.unlink(outpath)
-        # Build and print error description.
-        msg = 'FAILED: '
-        if g.reader.cursor:
-            msg = g.message.format('', msg)
-        if isinstance(e, EAsciiDoc):
-            g.message.stderr('%s%s' % (msg,str(e)))
-        else:
-            if is_main:
-                g.message.stderr(msg+'unexpected error:')
-                g.message.stderr('-'*60)
-                traceback.print_exc(file=sys.stderr)
-                g.message.stderr('-'*60)
-            else:
-                g.message.stderr('%sunexpected error: %s' % (msg,str(e)))
-        g.message.stderr(traceback.format_exc())
-        sys.exit(1)
+    #except Exception,e:
+    #    sys.stderr.write('exception' + os.linesep)
+    #    g.message.stderr(traceback.format_exc())
+    #    # Cleanup.
+    #    if outpath and os.path.isfile(outpath):
+    #        os.unlink(outpath)
+    #    # Build and print error description.
+    #    msg = 'FAILED: '
+    #    if g.reader.cursor:
+    #        msg = g.message.format('', msg)
+    #    if isinstance(e, EAsciiDoc):
+    #        g.message.stderr('%s%s' % (msg,str(e)))
+    #    else:
+    #        if is_main:
+    #            g.message.stderr(msg+'unexpected error:')
+    #            g.message.stderr('-'*60)
+    #            traceback.print_exc(file=sys.stderr)
+    #            g.message.stderr('-'*60)
+    #        else:
+    #            g.message.stderr('%sunexpected error: %s' % (msg,str(e)))
+    #    g.message.stderr(traceback.format_exc())
+    #    sys.exit(1)
 
 def usage(g, msg=''):
     if msg:
@@ -6232,7 +6257,12 @@ def show_help(g, topic, f=None):
             print >>f, line
 
 ### Used by asciidocapi.py ###
-def execute(infile, outfile,
+def execute(infile, outfile, **kwargs):
+    g = Global()
+    g.config.init()
+    execute_with_g(g, infile, outfile, **kwargs)
+
+def execute_with_g(g, infile, outfile,
         messages=[],
         inpath=None,
         outpath=None,
@@ -6246,7 +6276,11 @@ def execute(infile, outfile,
         attrs={},
         default_attrs={},
         no_header_footer=False,
-        verbose=False):
+        verbose=False,
+        imagesdir=None,
+        showcomments=None,
+        height=None,
+        **kwargs):
     """
     Execute asciidoc with command-line options and arguments.
     opts and args conform to values returned by getopt.getopt().
@@ -6271,8 +6305,6 @@ def execute(infile, outfile,
        >>>
 
     """
-    g = Global()
-    g.config.init()
     g.args = dict(
         messages=messages,
         inpath=inpath,
@@ -6287,7 +6319,10 @@ def execute(infile, outfile,
         attrs=attrs,
         default_attrs=default_attrs,
         no_header_footer=no_header_footer,
-        verbose=verbose
+        verbose=verbose,
+        imagesdir=imagesdir,
+        showcomments=showcomments,
+        **kwargs
         )
     g.message.messages = messages
     g.document.safe = safe
