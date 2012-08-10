@@ -224,7 +224,7 @@ class Message:
         If halt=False don't exit application, continue in the hope of reporting
         all fatal errors finishing with a non-zero exit code.
         """
-        if halt:
+        if True: #halt:
             raise EAsciiDoc, self.format(msg,linenos=False,cursor=cursor)
         else:
             msg = self.format(msg,'ERROR: ',cursor=cursor)
@@ -483,56 +483,144 @@ else:   # Use deprecated CPython compiler module.
         values = compiler.parse("[" + val + "]", mode='eval').node.asList()
         return [literal_eval(v) for v in values]
 
-def parse_attributes(attrs,dict):
-    """Update a dictionary with name/value attributes from the attrs string.
-    The attrs string is a comma separated list of values and keyword name=value
-    pairs. Values must preceed keywords and are named '1','2'... The entire
-    attributes list is named '0'. If keywords are specified string values must
-    be quoted. Examples:
+def parse_attributes(string, dict):
+  if not string:
+    return
+  strlen = len(string)
 
-    attrs: ''
-    dict: {}
+  def parse_whitespace(start):
+    if start >= strlen:
+      return None
+    ws = ''
+    while start < strlen and string[start] in (' ', '\n', '\t'):
+      ws = ws + string[start]
+      start = start + 1
+    return ws, start
 
-    attrs: 'hello,world'
-    dict: {'2': 'world', '0': 'hello,world', '1': 'hello'}
 
-    attrs: '"hello", planet="earth"'
-    dict: {'planet': 'earth', '0': '"hello",planet="earth"', '1': 'hello'}
-    """
-    def f(*args,**keywords):
-        # Name and add aguments '1','2'... to keywords.
-        for i in range(len(args)):
-            if not str(i+1) in keywords:
-                keywords[str(i+1)] = args[i]
-        return keywords
+  def parse_until_char(start, char):
+    if start >= strlen:
+      return None
+    end = string.find(char, start)
+    if end < 0:
+      return None
+    return string[start:end], end
 
-    if not attrs:
-        return
-    dict['0'] = attrs
-    # Replace line separators with spaces so line spanning works.
-    s = re.sub(r'\s', ' ', attrs)
-    d = {}
-    try:
-        d.update(get_args(s))
-        d.update(get_kwargs(s))
-        for v in d.values():
-            if not (isinstance(v,str) or isinstance(v,int) or isinstance(v,float) or v is None):
-                raise Exception
-    except Exception:
-        s = s.replace('"','\\"')
-        s = s.split(',')
-        s = map(lambda x: '"' + x.strip() + '"', s)
-        s = ','.join(s)
-        try:
-            d = {}
-            d.update(get_args(s))
-            d.update(get_kwargs(s))
-        except Exception:
-            return  # If there's a syntax error leave with {0}=attrs.
-        for k in d.keys():  # Drop any empty positional arguments.
-            if d[k] == '': del d[k]
-    dict.update(d)
-    assert len(d) > 0
+  def parse_until_char_or_eof(start, chars):
+    if start >= strlen:
+      return None
+    all_ends = [string.find(char, start) for char in chars]
+    ends = [idx for idx in all_ends if idx >= 0]
+    ends.sort()
+    if not ends:
+      return string[start:], strlen
+    else:
+      return string[start:ends[0]], ends[0]
+
+  def parse_quoted_string(start):
+    if start >= strlen:
+      return None
+    char = string[start]
+    if char in ("'", '"'):
+      ret = parse_until_char(start + 1, char)
+      if ret:
+        out, idx = ret
+        return out, idx + 1
+    return None
+
+  def parse_arg(start, end=','):
+    ret = parse_whitespace(start)
+    if ret:
+      ws, idx = ret
+      return parse_quoted_string(idx) or parse_until_char_or_eof(idx, end)
+    return None
+
+  def parse_args(start, end=''):
+    args = []
+    while True:
+      kw = parse_kwarg(start)
+      if kw:
+        break
+      ret = parse_arg(start, end=end+',')
+      if ret is None:
+        break
+      val, idx = ret
+      if idx < strlen and string[idx] not in end+',':
+        break
+      args.append(val)
+      if idx < strlen and string[idx] == end:
+        start = idx
+        break
+      start = idx + 1
+    if args:
+      return args, start
+    return None
+
+  def parse_tuple(start):
+    if start >= strlen:
+      return None
+    if string[start] == '(':
+      ret1 = parse_args(start + 1, end=')')
+      if ret1:
+        args, idx1 = ret1
+        if string[idx1] == ')':
+          return args, idx1 + 1
+    return None
+
+  def parse_kwarg(start):
+    if start >= strlen:
+      return None
+    ret = parse_whitespace(start)
+    if ret:
+      ws, idx = ret
+      ret1 = parse_until_char(idx, '=')
+      if ret1:
+        key, idx1 = ret1
+        if ',' in key or '"' in key or "'" in key or ' ' in key:
+          return None
+        ret2 = parse_arg(idx1 + 1) or parse_tuple(idx1 + 1)
+        if ret2:
+          val, idx2 = ret2
+          return {key:val}, idx2
+    return None
+
+  def parse_kwargs(start):
+    kwargs = {}
+    while True:
+      ret = parse_kwarg(start)
+      if ret is None:
+        break
+      kv, idx = ret
+      kwargs.update(kv)
+      start = idx + 1
+    if kwargs:
+      return kwargs, start
+    return None
+
+  args = None
+  kwargs = None
+  ret1 = parse_args(0)
+  if ret1:
+    args, idx = ret1
+    ret2 = parse_kwargs(idx)
+    if ret2:
+      kwargs, idx = ret2
+  else:
+    ret2 = parse_kwargs(0)
+    if ret2:
+      kwargs, idx = ret2
+
+  d = {}
+  if kwargs:
+    d.update(kwargs)
+  d['0'] = string
+  if args:
+    for idx, arg in enumerate(args):
+      d[str(idx + 1)] = arg
+
+  dict.update(d)
+  return d
+
 
 def parse_named_attributes(s,attrs):
     """Update a attrs dictionary with name="value" attributes from the s string.
@@ -869,7 +957,10 @@ def filter_lines(g, filter_cmd, lines, attrs={}):
     if not filter_cmd or not filter_cmd.strip():
         return lines
     # Perform attributes substitution on the filter command.
-    s = subs_attrs(g, filter_cmd, attrs)
+    str_attrs = {}
+    for k, v in attrs.items():
+        str_attrs[k] = str(v)
+    s = subs_attrs(g, filter_cmd, str_attrs)
     if not s:
         g.message.error('undefined filter attribute in command: %s' % filter_cmd)
         return []
@@ -1150,8 +1241,8 @@ def subs_attrs(g, lines, dictionary=None):
         for k,v in dictionary.items():
             if v is None:
                 del dictionary[k]
-            else:
-                v = subs_attrs(g,str(v))
+            elif type(v) in (str, unicode):
+                v = subs_attrs(g,v)
                 if v is None:
                     del dictionary[k]
                 else:
@@ -6259,7 +6350,6 @@ def show_help(g, topic, f=None):
 ### Used by asciidocapi.py ###
 def execute(infile, outfile, **kwargs):
     g = Global()
-    g.config.init()
     execute_with_g(g, infile, outfile, **kwargs)
 
 def execute_with_g(g, infile, outfile,
@@ -6332,6 +6422,7 @@ def execute_with_g(g, infile, outfile,
     g.config.dumping = dump_conf
     g.config.header_footer = not no_header_footer
     g.config.verbose = verbose
+    g.config.init()
 
     asciidoc(g, backend, doctype, conf_files, infile, outfile, no_conf, inpath, outpath)
     if g.document.has_errors:
