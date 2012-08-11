@@ -224,7 +224,7 @@ class Message:
         If halt=False don't exit application, continue in the hope of reporting
         all fatal errors finishing with a non-zero exit code.
         """
-        if halt:
+        if True: #halt:
             raise EAsciiDoc, self.format(msg,linenos=False,cursor=cursor)
         else:
             msg = self.format(msg,'ERROR: ',cursor=cursor)
