@@ -762,8 +762,8 @@ def nested_execute_fn(g):
         args.update(kwargs)
         args['no_header_footer'] = True
         args['attrs'].update(g.attribute_entry.attributes)
-        if 'title' in args:
-            del args['title']
+        if 'title' in args['attrs']:
+            del args['attrs']['title']
         execute(infile, outfile, **args)
     return nested_execute
 
