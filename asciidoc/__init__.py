@@ -871,7 +871,7 @@ def filter_lines(g, filter_cmd, lines, attrs={}):
     # Perform attributes substitution on the filter command.
     str_attrs = {}
     for k, v in attrs.items():
-      str_attrs[k] = str(v)
+        str_attrs[k] = str(v)
     s = subs_attrs(g, filter_cmd, str_attrs)
     if not s:
         g.message.error('undefined filter attribute in command: %s' % filter_cmd)
