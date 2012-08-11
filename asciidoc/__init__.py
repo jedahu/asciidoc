@@ -6259,7 +6259,6 @@ def show_help(g, topic, f=None):
 ### Used by asciidocapi.py ###
 def execute(infile, outfile, **kwargs):
     g = Global()
-    g.config.init()
     execute_with_g(g, infile, outfile, **kwargs)
 
 def execute_with_g(g, infile, outfile,
@@ -6332,6 +6331,7 @@ def execute_with_g(g, infile, outfile,
     g.config.dumping = dump_conf
     g.config.header_footer = not no_header_footer
     g.config.verbose = verbose
+    g.config.init()
 
     asciidoc(g, backend, doctype, conf_files, infile, outfile, no_conf, inpath, outpath)
     if g.document.has_errors:
