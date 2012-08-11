@@ -1153,12 +1153,15 @@ def subs_attrs(g, lines, dictionary=None):
         for k,v in dictionary.items():
             if v is None:
                 del dictionary[k]
-            else:
-                v = subs_attrs(g,str(v))
+            elif type(v) in (str, unicode):
+                v = subs_attrs(g,v)
                 if v is None:
                     del dictionary[k]
                 else:
                     dictionary[k] = v
+            elif type(v) in (list, tuple):
+                v = tuple([subs_attrs(g,x) for x in v])
+                dictionary[k] = v
         attrs.update(dictionary)
     # Substitute all attributes in all lines.
     result = []
