@@ -2171,7 +2171,8 @@ class AttributeList:
                 if k == 'attrlist':
                     v = subs_attrs(self.g,v)
                     if v:
-                        parse_attributes(v, attrs)
+                        for s in v:
+                            parse_attributes(s, attrs)
                 else:
                     self.attrs[k] = v
         self.subs(attrs)
