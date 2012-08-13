@@ -605,7 +605,7 @@ def parse_attributes(in_string, dict):
         key, idx1 = ret1
         if ',' in key or '"' in key or "'" in key or ' ' in key:
           return None
-        ret2 = parse_arg(idx1 + 1) or parse_tuple(idx1 + 1)
+        ret2 = parse_tuple(idx1 + 1) or parse_arg(idx1 + 1)
         if ret2:
           val, idx2 = ret2
           return {key:val}, idx2
