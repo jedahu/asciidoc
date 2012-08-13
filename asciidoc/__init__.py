@@ -4368,8 +4368,6 @@ class Calloutmap:
 # Input stream Reader and output stream writer classes.
 #---------------------------------------------------------------------------
 
-UTF8_BOM = '\xef\xbb\xbf'
-
 class Reader1:
     """Line oriented AsciiDoc input file reader. Processes include and
     conditional inclusion system macros. Tabs are expanded and lines are right
@@ -4410,9 +4408,6 @@ class Reader1:
         self.next = []
         # Prefill buffer by reading the first line and then pushing it back.
         if Reader1.read(self):
-            if self.cursor[2].startswith(UTF8_BOM):
-                self.cursor[2] = self.cursor[2][len(UTF8_BOM):]
-                self.bom = UTF8_BOM
             self.unread(self.cursor)
             self.cursor = None
     def closefile(self):
