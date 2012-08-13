@@ -766,7 +766,7 @@ This will not be processed.
 endif::[]
 
 // Test eval block macro.
-eval::[Section.setlevel(1)]
+eval::[g.section.setlevel(1)]
 
 // Test template concatenation.
 {template:test-template}
