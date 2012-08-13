@@ -1,0 +1,30 @@
+Incompatibilities
+=================
+
+This AsciiDoc variant is incompatible with vanilla AsciiDoc in the following
+ways:
+
+
+
+1. List argument substitution
+-----------------------------
+
+
+=== Vanilla
+
+In vanilla AsciiDoc any arguments enclosed in single quotes will be subject to
+macro expansion,
+
+    [quote,'http://en.wikipedia.org/wiki/Harriet_Tubman[Harriet Tubman]']
+
+this applies to single quotes inside double quotes as well:
+
+    [quote,"'http://en.wikipedia.org/wiki/Harriet_Tubman[Harriet Tubman]'"]
+
+
+=== Variant
+
+Arguments enclosed in single quotes will be subject to macro expansion. This
+does not apply to single quotes inside double quotes.
+
+// vim: ft=asciidoc:
