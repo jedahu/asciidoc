@@ -43,7 +43,7 @@ CAUTION: Lorum ipsum.
 IMPORTANT: Lorum ipsum.
 
 .Tiger
-image::../../images/tiger.png[Tiger image]
+image::../../asciidoc/images/tiger.png[Tiger image]
 
 Gevolgd door een voorbeeld tabel:
 
