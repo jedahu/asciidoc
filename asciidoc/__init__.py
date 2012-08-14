@@ -490,11 +490,15 @@ class Subsable:
     def __str__(self):
         return self.content
 
-def parse_attributes(in_string, dict):
-  if not in_string:
+def parse_attributes(in_thing, dict):
+  if not in_thing:
+    return
+  if getattr(in_thing, '__iter__', False):
+    for x in in_thing:
+      parse_attributes(x, dict)
     return
 
-  string = in_string.replace('\n', ' ')
+  string = in_thing.replace('\n', ' ')
 
   strlen = len(string)
 
@@ -640,7 +644,7 @@ def parse_attributes(in_string, dict):
   d = {}
   if kwargs:
     d.update(kwargs)
-  d['0'] = in_string
+  d['0'] = in_thing
   if args:
     for idx, arg in enumerate(args):
       d[str(idx + 1)] = arg
@@ -2171,8 +2175,7 @@ class AttributeList:
                 if k == 'attrlist':
                     v = subs_attrs(self.g,v)
                     if v:
-                        for s in v:
-                            parse_attributes(s, attrs)
+                        parse_attributes(v, attrs)
                 else:
                     self.attrs[k] = v
         self.subs(attrs)
