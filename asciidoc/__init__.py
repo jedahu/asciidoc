@@ -2186,11 +2186,11 @@ class AttributeList:
             if isinstance(v, Subsable):
                 attrs[k] = self.g.lex.subs_1(str(v), self.g.config.subsnormal)
             elif type(v) is list:
-                attrs[k] = [
-                    self.g.lex.subs_1(str(x), self.g.config.subsnormal)
-                    for x in v
-                    if isinstance(x, Subsable)
-                    ]
+                def do_subs(x):
+                    if isinstance(x, Subsable):
+                        return self.g.lex.subs_1(str(x), self.g.config.subsnormal)
+                    return x
+                attrs[k] = [do_subs(x) for x in v]
     def style(self):
         return self.attrs.get('style') or self.attrs.get('1')
     def consume(self, d={}):
