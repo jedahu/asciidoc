@@ -1,1 +1,1 @@
-../../javascripts/LaTeXMathML.js
+../../asciidoc/javascripts/LaTeXMathML.js

@@ -1,1 +1,1 @@
-../../docbook-xsl/asciidoc-docbook-xsl.txt
+../../asciidoc/docbook-xsl/asciidoc-docbook-xsl.txt

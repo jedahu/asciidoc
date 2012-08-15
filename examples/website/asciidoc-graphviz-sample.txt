@@ -1,1 +1,1 @@
-../../filters/graphviz/asciidoc-graphviz-sample.txt
+../../asciidoc/filters/graphviz/asciidoc-graphviz-sample.txt

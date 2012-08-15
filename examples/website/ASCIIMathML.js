@@ -1,1 +1,1 @@
-../../javascripts/ASCIIMathML.js
+../../asciidoc/javascripts/ASCIIMathML.js
