@@ -5,18 +5,11 @@ from os import listdir
 import sys
 import imp
 
-EXTRA_PATH='asciidoc'
-MANIFEST_LIST='MANIFEST.list'
-
-# Is there a better way to do this?
-def install_dir():
-  '''Return directory where asciidoc.py is installed'''
-  return join(
-      sys.prefix, 'lib', 'python' + sys.version[:3], 'site-packages', EXTRA_PATH)
+MANIFEST_LIST='PKG_MANIFEST'
 
 # Modified from
 # http://wiki.python.org/moin/Distutils/Cookbook/AutoDataDiscovery
-def non_python_files(install_prefix, path):
+def non_python_files(path):
     """ Return all non-python-file filenames in path """
     result = []
     all_results = []
@@ -30,22 +23,15 @@ def non_python_files(install_prefix, path):
             ):
             result.append(name)
         elif isdir(name) and item.lower() not in ignore_dirs:
-            all_results.extend(non_python_files(install_prefix, name))
+            all_results.extend(non_python_files(name))
     if result:
-        all_results.append((join(install_prefix, path), result))
+        all_results.append((path, result))
     return all_results
 
-def data_files_from_manifest(install_prefix):
+def files_from_manifest():
   '''Use MANIFEST to generate a list for the data_files parameter'''
-  out = []
   with open(MANIFEST_LIST) as manifest:
-    for line in manifest:
-      for path in glob(line.strip()):
-        if isdir(path):
-          out.extend(non_python_files(install_prefix, path))
-        else:
-          out.append((join(install_prefix, dirname(path)), [path]))
-  return out
+    return [x.strip() for x in manifest.readlines()]
 
 setup(
     name='AsciiDoc',
@@ -59,5 +45,7 @@ setup(
     scripts=['scripts/asciidoc'],
     py_modules=['asciidocapi'],
     packages=['asciidoc'],
+    package_dir={'asciidoc': 'asciidoc'},
+    package_data={'asciidoc': files_from_manifest()},
     include_package_data=True
     )
