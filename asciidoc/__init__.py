@@ -947,6 +947,8 @@ def py_filter_lines(g, module, function, kwargs, lines, attrs={}):
             kw_attrs[key] = attrs[key]
         elif key in g.document.attributes:
             kw_attrs[key] = g.document.attributes[key]
+        elif key in g.config.cmd_attrs:
+            kw_attrs[key] = g.config.cmd_attrs[key]
     filter_fn = getattr(filter_mod, function)
     output = filter_fn(lines, **kw_attrs)
     if output and type(output) == unicode or type(output) == str:
