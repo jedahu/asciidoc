@@ -1305,7 +1305,8 @@ def subs_attrs(g, lines, dictionary=None):
             if s is None:
                 pos = mo.end()
             else:
-                s = str(s)
+                if type(s) not in (str, unicode):
+                    s = str(s)
                 line = line[:mo.start()] + s + line[mo.end():]
                 pos = mo.start() + len(s)
         # Expand conditional attributes.
