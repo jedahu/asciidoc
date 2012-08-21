@@ -6219,6 +6219,7 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, no_conf, inpath, ou
                     g.config.load_file(f, include=include, exclude=exclude)
                 else:
                     raise EAsciiDoc,'missing configuration file: %s' % f
+    indir=None
     try:
         g.document.attributes['python'] = sys.executable
         for f in g.config.filters:
@@ -6269,9 +6270,10 @@ def asciidoc(g, backend, doctype, confiles, infile, outfile, no_conf, inpath, ou
             g.document.load_lang()
             if inpath:
                 # Load local conf files (files in the source file directory).
-                g.config.load_file('asciidoc.conf', indir)
-                g.config.load_backend([indir])
-                g.config.load_filters([indir])
+                if indir:
+                    g.config.load_file('asciidoc.conf', indir)
+                    g.config.load_backend([indir])
+                    g.config.load_filters([indir])
                 # Load document specific configuration files.
                 f = os.path.splitext(inpath)[0]
                 doc_conffiles = [
