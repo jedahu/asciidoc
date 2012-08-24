@@ -2464,6 +2464,7 @@ class Section:
         self.g = g
         self.endtags = []  # Stack of currently open section (level,endtag) tuples.
         self.ids = []      # List of already used ids.
+        self.id = None
 
     def savetag(self,level,etag):
         """Save section end."""
@@ -2515,7 +2516,7 @@ class Section:
         if not g.document.attributes.get('sectids') is None \
                 and 'id' not in g.attribute_list.attrs:
             # Generate ids for sections.
-            g.attribute_list.attrs['id'] = self.gen_id(g.title.attributes['title'])
+            g.attribute_list.attrs['id'] = self.id = self.gen_id(g.title.attributes['title'])
 
     def translate(self):
         g = self.g
@@ -2552,6 +2553,11 @@ class Section:
         self.savetag(g.title.level,etag)
         g.writer.write(stag,trace='section open: level %d: %s' %
                 (g.title.level, g.title.attributes['title']))
+        if 'section' in g.log_names and g.log is not None:
+          g.log.append(['section', dict(
+            id=self.id,
+            level=g.title.level,
+            text=g.title.attributes['title'])])
         self.translate_body()
 
     def translate_body(self,terminator=None):
@@ -4213,6 +4219,7 @@ class Macro:
                 self.g.attribute_list.consume(d)
                 self.g.block_title.consume(d)
             # Parse macro attributes.
+            attrs = {}
             if 'attrlist' in d:
                 if d['attrlist'] in (None,''):
                     del d['attrlist']
@@ -4220,7 +4227,8 @@ class Macro:
                     if self.prefix == '':
                         # Unescape ] characters in inline macros.
                         d['attrlist'] = d['attrlist'].replace('\\]',']')
-                    parse_attributes(d['attrlist'],d)
+                    parse_attributes(d['attrlist'],attrs)
+                    d.update(attrs)
                     # Generate option attributes.
                     if 'options' in d:
                         options = parse_options(d['options'], (),
@@ -4264,6 +4272,11 @@ class Macro:
                     result = '\n'.join(body)
             if a0:
                 result = result.replace(chr(0), a0)
+            if name in self.g.log_names and self.g.log is not None:
+              val = {}
+              val.update(attrs)
+              val['target'] = d.get('target')
+              self.g.log.append([name, val])
             return result
 
         return self.reo.sub(subs_func, text)
@@ -6204,6 +6217,9 @@ class Global(object):
 
         self.args = {}
 
+        self.log_names = set()
+        self.log = None
+
 def asciidoc(g, backend, doctype, confiles, infile, outfile, no_conf, inpath, outpath):
     """Convert AsciiDoc document to DocBook document of type doctype
     The AsciiDoc document is read from file object src the translated
@@ -6413,6 +6429,8 @@ def execute_with_g(g, infile, outfile,
         imagesdir=None,
         showcomments=None,
         height=None,
+        log_names=[],
+        log=None,
         **kwargs):
     """
     Execute asciidoc with command-line options and arguments.
@@ -6455,9 +6473,13 @@ def execute_with_g(g, infile, outfile,
         verbose=verbose,
         imagesdir=imagesdir,
         showcomments=showcomments,
+        log_names=log_names,
+        log=log,
         **kwargs
         )
     g.message.messages = messages
+    g.log_names = set(log_names)
+    g.log = log
     g.document.safe = safe
     g.config.filters.extend(filters)
     g.document.attributes.update(default_attrs)
