@@ -4275,7 +4275,7 @@ class Macro:
             if name in self.g.log_names and self.g.log is not None:
               val = {}
               val.update(attrs)
-              val['target'] = d.get('target')
+              val.update(d)
               self.g.log.append([name, val])
             return result
 
