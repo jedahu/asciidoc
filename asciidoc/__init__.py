@@ -3096,6 +3096,7 @@ class List(AbstractBlock):
         self.translate_item()
         g.writer.write(entrytag[1],trace='list entry close')
     def translate_item(self):
+        self.attributes['index'] = self.index
         g = self.g
         if self.type == 'callout':
             self.attributes['coids'] = g.calloutmap.calloutids(self.ordinal)
